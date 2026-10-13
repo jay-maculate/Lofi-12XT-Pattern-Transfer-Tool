@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lofi-12XT Pattern Transfer Tool</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Lofi-12XT Pattern Transfer Tool</h1>
+    <div class="header-actions">
+      <button id="info" type="button" class="ghost" aria-label="How to use this tool">Info</button>
+      <button id="open" type="button">Open SD card</button>
+    </div>
+  </header>
+  <main id="workspace" hidden>
+    <section id="side-a" class="side"></section>
+    <section id="side-b" class="side"></section>
+  </main>
+  <dialog id="info-help">
+    <h2>What this tool does</h2>
+    <p>This tool lets you copy patterns and their samples from one Lofi-12XT project into another.</p>
+    <h2>How to use this tool</h2>
+    <ol>
+      <li>Click <strong>Open SD card</strong>. Select the <strong>Lofi-12XT</strong> folder, then click <strong>Open</strong>. Do not open a folder inside it.</li>
+      <li>Choose a project on the left and a project on the right. The numbers match the project slots on the device.</li>
+      <li>Click a pattern to see its samples, waveforms, and playback. Click again to close it.</li>
+      <li>Drag a pattern from one side to a slot on the other. Its samples are loaded into free slots. The wav files are copied only when that project does not already have them.</li>
+      <li>The trash icon clears that pattern and any sample slots no other pattern uses. The wav files stay on the card. You must click <strong>OK</strong> to confirm.</li>
+    </ol>
+    <form method="dialog">
+      <button value="ok" type="submit">Close</button>
+    </form>
+  </dialog>
+  <dialog id="pick-help">
+    <h2>Choose the Lofi-12XT folder</h2>
+    <p>In the next window, select the <strong>Lofi-12XT</strong> folder on your SD card, then click <strong>Open</strong> (or <strong>Select Folder</strong>).</p>
+    <p>You do not need to open Project, Pool, or any folder inside it.</p>
+    <form method="dialog">
+      <button value="cancel" type="submit" class="ghost">Cancel</button>
+      <button id="pick-continue" value="ok" type="button">Continue</button>
+    </form>
+  </dialog>
+  <section id="log" aria-live="polite">
+    <div id="boot">Loading…</div>
+  </section>
+  <script>
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        const boot = document.querySelector("#boot");
+        if (!boot) return;
+        boot.textContent = location.protocol === "file:"
+          ? "This page was opened as a file. Chrome blocks the folder picker from file://. Serve the folder and open http://localhost instead."
+          : "The page script did not start. Open this site over http://localhost or https://.";
+      }, 400);
+    });
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
