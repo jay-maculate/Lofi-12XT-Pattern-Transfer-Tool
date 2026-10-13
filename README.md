@@ -6,13 +6,6 @@ Open the page in Chrome or Edge, choose the SD card (or its `System` folder), pi
 
 The page reads and writes the card directly. Nothing is uploaded.
 
-## Host it on GitHub Pages
-
-1. Create a repository whose root is this folder (`index.html` at the top).
-2. In the repository settings, open Pages and set the source to the main branch, folder `/ (root)`.
-3. Open the published `https://` address in Chrome or Edge.
-
-The folder picker only works on `https://` pages and on `localhost`. Firefox does not support it.
 
 ## What gets copied
 
