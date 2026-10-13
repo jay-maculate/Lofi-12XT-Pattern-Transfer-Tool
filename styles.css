@@ -42,6 +42,16 @@ h1 {
 
 h1 { margin: 0; }
 
+.title-block { min-width: 0; }
+
+.disclaimer {
+  margin: 6px 0 0;
+  max-width: 46rem;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 button, select {
   font: inherit;
   color: var(--ink);

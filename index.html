@@ -8,7 +8,10 @@
 </head>
 <body>
   <header>
-    <h1>Lofi-12XT Pattern Transfer Tool</h1>
+    <div class="title-block">
+      <h1>Lofi-12XT Pattern Transfer Tool</h1>
+      <p class="disclaimer">Warning - This tool will overwrite pattern data on your SD card. Consider making a backup before using.</p>
+    </div>
     <div class="header-actions">
       <button id="info" type="button" class="ghost" aria-label="How to use this tool">Info</button>
       <button id="open" type="button">Open SD card</button>
@@ -21,6 +24,7 @@
   <dialog id="info-help">
     <h2>What this tool does</h2>
     <p>This tool lets you copy patterns and their samples from one Lofi-12XT project into another.</p>
+    <p>It is designed for Lofi-12XT firmware version 1.5.</p>
     <h2>How to use this tool</h2>
     <ol>
       <li>Click <strong>Open SD card</strong>. Select the <strong>Lofi-12XT</strong> folder, then click <strong>Open</strong>. Do not open a folder inside it.</li>
@@ -37,6 +41,7 @@
     <h2>Choose the Lofi-12XT folder</h2>
     <p>In the next window, select the <strong>Lofi-12XT</strong> folder on your SD card, then click <strong>Open</strong> (or <strong>Select Folder</strong>).</p>
     <p>You do not need to open Project, Pool, or any folder inside it.</p>
+    <p>Warning - This tool will overwrite pattern data on your SD card. Consider making a backup before using.</p>
     <form method="dialog">
       <button value="cancel" type="submit" class="ghost">Cancel</button>
       <button id="pick-continue" value="ok" type="button">Continue</button>
