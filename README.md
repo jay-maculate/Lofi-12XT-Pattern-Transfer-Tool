@@ -2,7 +2,7 @@
 
 https://jay-maculate.github.io/Lofi-12XT-Pattern-Transfer-Tool/
 
-Move a pattern, and the samples it uses, from one Lofi-12 XT project to another.
+Move a pattern, and the samples it uses, from one Lofi-12XT project to another.
 
 Open the page in Chrome or Edge, choose the SD card (or its `System` folder), pick a project on each side, and drag a pattern across. Drop it on a slot to replace that slot, or drop it on the empty part of the list to use the first empty slot.
 
