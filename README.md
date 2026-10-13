@@ -1,4 +1,4 @@
-# Lofi-12 XT patterns
+# Lofi-12XT Pattern Transfer Tool
 
 Move a pattern, and the samples it uses, from one Lofi-12 XT project to another.
 
