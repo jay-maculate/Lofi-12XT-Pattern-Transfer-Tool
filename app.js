@@ -443,6 +443,33 @@ function paintSelection(sideIndex) {
   for (const row of list.querySelectorAll(".pattern")) {
     row.classList.toggle("selected", selection[sideIndex].has(Number(row.dataset.number)));
   }
+  updateSelectionSummary(sideIndex);
+}
+
+function selectionSummaryText(sideIndex) {
+  const numbers = [...selection[sideIndex]];
+  const project = projects[sideIndex];
+  if (!project || numbers.length < 2) return "";
+  const samples = new Set();
+  for (const number of numbers) {
+    const item = project.patterns[number - 1];
+    if (!item) continue;
+    for (const track of item.info.tracks) {
+      if (track.slot <= 0) continue;
+      samples.add(project.slots[track.slot]?.path || `slot:${track.slot}`);
+    }
+  }
+  const patterns = `${numbers.length} patterns`;
+  const sampleLabel = `${samples.size} unique ${samples.size === 1 ? "sample" : "samples"}`;
+  return `${patterns} selected, ${sampleLabel}`;
+}
+
+function updateSelectionSummary(sideIndex) {
+  const summary = sides[sideIndex].querySelector(".selection-summary");
+  if (!summary) return;
+  const text = selectionSummaryText(sideIndex);
+  summary.textContent = text;
+  summary.hidden = !text;
 }
 
 function renderSide(sideIndex) {
@@ -482,6 +509,10 @@ function renderSide(sideIndex) {
     }
   });
   head.append(select);
+  const summary = document.createElement("p");
+  summary.className = "selection-summary";
+  summary.hidden = true;
+  head.prepend(summary);
   if (project?.slots) {
     const usedSamples = project.slots.filter((slot) => slot.index > 0 && slot.file).length;
     const usedPatterns = project.patterns.filter((item) => item && !item.info.empty).length;
@@ -494,6 +525,7 @@ function renderSide(sideIndex) {
     head.append(usage);
   }
   root.append(head);
+  updateSelectionSummary(sideIndex);
   const list = document.createElement("div");
   list.className = "list";
   list.addEventListener("dragover", (event) => {

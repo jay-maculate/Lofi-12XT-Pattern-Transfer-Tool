@@ -199,10 +199,23 @@ export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoo
   let cursor = 1;
   const nextFree = () => {
     while (cursor < 256 && taken.has(cursor)) cursor++;
-    if (cursor >= 256) throw new Error("The destination project has no free sample slots");
+    if (cursor >= 256) throw new Error("Your selection exceeds the available number of sample slots");
     taken.add(cursor);
     return cursor++;
   };
+  const needed = [];
+  for (const srcIndex of [...new Set(sourceIndexes.filter((n) => n > 0))]) {
+    const src = sourceSlotList[srcIndex];
+    if (!src?.path) throw new Error(`Track points at empty sample slot ${srcIndex + 1}`);
+    if (byPath.has(src.path) || aliases.has(src.path)) continue;
+    needed.push(srcIndex);
+  }
+  let free = 0;
+  for (let index = 1; index < 256; index++) if (!taken.has(index)) free += 1;
+  if (needed.length > free) {
+    const over = needed.length - free;
+    throw new Error(`Your selection exceeds the available number of sample slots by ${over} ${over === 1 ? "sample" : "samples"}`);
+  }
   const map = new Map();
   const copies = [];
   for (const srcIndex of [...new Set(sourceIndexes.filter((n) => n > 0))]) {

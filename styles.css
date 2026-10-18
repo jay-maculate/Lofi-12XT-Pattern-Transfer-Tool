@@ -109,6 +109,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 .side-head { padding: 12px; }
 
+.selection-summary {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.selection-summary[hidden] { display: none; }
+
 select { width: 100%; padding: 8px; }
 
 .usage { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
