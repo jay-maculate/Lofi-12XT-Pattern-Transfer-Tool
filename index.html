@@ -31,6 +31,8 @@
       <li>Choose a project on the left and a project on the right. The numbers match the project slots on the device.</li>
       <li>Click a pattern to see its samples, waveforms, and playback. Click again to close it.</li>
       <li>Drag a pattern from one side to a slot on the other. Its samples are loaded into free slots. The wav files are copied only when that project does not already have them.</li>
+      <li>Hold Shift and click patterns to select more than one, then drag the group. They are placed in order, starting at the slot you drop on.</li>
+      <li>Drag a pattern up or down inside the same project to move it. The slot you dragged from is cleared.</li>
       <li>The trash icon clears that pattern and any sample slots no other pattern uses. The wav files stay on the card. You must click <strong>OK</strong> to confirm.</li>
     </ol>
     <form method="dialog">
@@ -41,13 +43,22 @@
     <h2>Choose the Lofi-12XT folder</h2>
     <p>In the next window, select the <strong>Lofi-12XT</strong> folder on your SD card, then click <strong>Open</strong> (or <strong>Select Folder</strong>).</p>
     <p>You do not need to open Project, Pool, or any folder inside it.</p>
-    <p>Warning - This tool will overwrite pattern data on your SD card. Consider making a backup before using.</p>
+    <p class="warning">Warning - This tool will overwrite pattern data on your SD card. Consider making a backup before using.</p>
     <form method="dialog">
       <button value="cancel" type="submit" class="ghost">Cancel</button>
       <button id="pick-continue" value="ok" type="button">Continue</button>
     </form>
   </dialog>
-  <section id="log" aria-live="polite">
+  <dialog id="progress">
+    <h2>Copying</h2>
+    <p id="progress-label"></p>
+    <div class="track"><div class="fill"></div></div>
+    <ul id="progress-files"></ul>
+    <form method="dialog">
+      <button id="progress-close" type="submit" hidden>Close</button>
+    </form>
+  </dialog>
+  <section id="boot-note">
     <div id="boot">Loading…</div>
   </section>
   <script>

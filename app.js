@@ -14,16 +14,46 @@ import {
 const openButton = document.querySelector("#open");
 document.querySelector("#boot")?.remove();
 const workspace = document.querySelector("#workspace");
-const logEl = document.querySelector("#log");
 const sides = [document.querySelector("#side-a"), document.querySelector("#side-b")];
 
 let system = null;
 const projects = [null, null];
+const selection = [new Set(), new Set()];
+const selectionAnchor = [null, null];
+let progressBusy = false;
 
-function log(message) {
-  const line = document.createElement("div");
-  line.textContent = message;
-  logEl.prepend(line);
+document.querySelector("#progress").addEventListener("cancel", (event) => {
+  if (progressBusy) event.preventDefault();
+});
+
+function openProgress(title) {
+  const dialog = document.querySelector("#progress");
+  dialog.querySelector("h2").textContent = title;
+  document.querySelector("#progress-label").textContent = "";
+  document.querySelector("#progress-files").replaceChildren();
+  dialog.querySelector(".fill").style.width = "0%";
+  document.querySelector("#progress-close").hidden = true;
+  progressBusy = true;
+  if (!dialog.open) dialog.showModal();
+}
+
+function reportProgress(done, total, label) {
+  document.querySelector("#progress-label").textContent = label;
+  document.querySelector("#progress .fill").style.width = `${Math.round((done / total) * 100)}%`;
+  const line = document.createElement("li");
+  line.textContent = label;
+  document.querySelector("#progress-files").append(line);
+}
+
+function closeProgress() {
+  progressBusy = false;
+  document.querySelector("#progress").close();
+}
+
+function failProgress(message) {
+  progressBusy = false;
+  document.querySelector("#progress-label").textContent = message;
+  document.querySelector("#progress-close").hidden = false;
 }
 
 async function hasDir(dir, name) {
@@ -307,8 +337,15 @@ function renderPattern(item, sideIndex) {
       meta.append(part);
     });
   }
+  if (selection[sideIndex].has(item.number)) row.classList.add("selected");
   if (!item.info.empty) title.draggable = true;
-  title.addEventListener("click", () => {
+  title.addEventListener("click", (event) => {
+    if (event.shiftKey && !item.info.empty) {
+      selectRange(sideIndex, item.number);
+      paintSelection(sideIndex);
+      return;
+    }
+    if (!item.info.empty) selectionAnchor[sideIndex] = item.number;
     const open = row.querySelector(".samples");
     if (open) {
       stopPlayback();
@@ -321,8 +358,11 @@ function renderPattern(item, sideIndex) {
   });
   row.append(title, meta);
   title.addEventListener("dragstart", (event) => {
-    event.dataTransfer.setData("text/plain", `${sideIndex}:${item.number}`);
-    event.dataTransfer.effectAllowed = "copy";
+    const numbers = selection[sideIndex].has(item.number)
+      ? [...selection[sideIndex]].sort((a, b) => a - b)
+      : [item.number];
+    event.dataTransfer.setData("text/plain", `${sideIndex}:${numbers.join(",")}`);
+    event.dataTransfer.effectAllowed = "copyMove";
   });
   row.addEventListener("dragover", (event) => {
     event.preventDefault();
@@ -333,8 +373,8 @@ function renderPattern(item, sideIndex) {
     event.preventDefault();
     event.stopPropagation();
     row.classList.remove("drop");
-    const [fromSide, fromNumber] = event.dataTransfer.getData("text/plain").split(":").map(Number);
-    dropPattern(fromSide, fromNumber, sideIndex, item.number);
+    const drag = readDrag(event.dataTransfer.getData("text/plain"));
+    transferPatterns(drag.side, drag.numbers, sideIndex, item.number);
   });
   return row;
 }
@@ -354,9 +394,40 @@ function usageMeter(label, fraction) {
   return row;
 }
 
+function readDrag(payload) {
+  const [side, list] = payload.split(":");
+  return {
+    side: Number(side),
+    numbers: (list || "").split(",").map(Number).filter((n) => n > 0),
+  };
+}
+
+function selectRange(sideIndex, number) {
+  const selected = selection[sideIndex];
+  if (selectionAnchor[sideIndex] == null) selectionAnchor[sideIndex] = number;
+  const anchor = selectionAnchor[sideIndex];
+  selected.clear();
+  const lo = Math.min(anchor, number);
+  const hi = Math.max(anchor, number);
+  for (let n = lo; n <= hi; n++) {
+    const item = projects[sideIndex].patterns[n - 1];
+    if (item && !item.info.empty) selected.add(n);
+  }
+  if (selected.size === 0) selected.add(number);
+}
+
+function paintSelection(sideIndex) {
+  const list = sides[sideIndex].querySelector(".list");
+  if (!list) return;
+  for (const row of list.querySelectorAll(".pattern")) {
+    row.classList.toggle("selected", selection[sideIndex].has(Number(row.dataset.number)));
+  }
+}
+
 function renderSide(sideIndex) {
   const root = sides[sideIndex];
   const project = projects[sideIndex];
+  const scrollTop = root.querySelector(".list")?.scrollTop || 0;
   root.innerHTML = "";
   const head = document.createElement("div");
   head.className = "side-head";
@@ -380,12 +451,13 @@ function renderSide(sideIndex) {
     try {
       const loaded = await loadProject(chosen, sideIndex);
       loaded.choices = project.choices;
+      selection[sideIndex].clear();
+      selectionAnchor[sideIndex] = null;
       projects[sideIndex] = loaded;
       renderSide(sideIndex);
-      log(`${chosen}: ${loaded.patterns.filter((p) => p && !p.info.empty).length} patterns with samples.`);
     } catch (error) {
       select.disabled = false;
-      log(error.message);
+      alert(error.message);
     }
   });
   head.append(select);
@@ -411,19 +483,20 @@ function renderSide(sideIndex) {
     else if (event.clientY > rect.bottom - edge) list.scrollTop += 18;
   });
   list.addEventListener("drop", (event) => {
-    const [fromSide, fromNumber] = event.dataTransfer.getData("text/plain").split(":").map(Number);
+    const drag = readDrag(event.dataTransfer.getData("text/plain"));
     const dest = projects[sideIndex];
     const empty = dest?.patterns.find((p) => p && p.info.empty);
     if (!empty) {
-      log("Drop onto a pattern slot. This project has no empty slot.");
+      alert("Drop onto a pattern slot. This project has no empty slot.");
       return;
     }
-    dropPattern(fromSide, fromNumber, sideIndex, empty.number);
+    transferPatterns(drag.side, drag.numbers, sideIndex, empty.number);
   });
   if (project?.patterns) {
     for (const item of project.patterns) list.append(renderPattern(item, sideIndex));
   }
   root.append(list);
+  list.scrollTop = scrollTop;
 }
 
 async function deletePattern(sideIndex, item) {
@@ -456,7 +529,7 @@ async function deletePattern(sideIndex, item) {
 
   const template = project.patterns.find((pattern) => pattern && pattern.info.empty);
   if (!template) {
-    log("This project has no empty pattern to restore, so this one was left in place.");
+    alert("This project has no empty pattern to restore, so this one was left in place.");
     return;
   }
   try {
@@ -474,10 +547,10 @@ async function deletePattern(sideIndex, item) {
       bytes: blank,
       info: parsePattern(blank),
     };
+    selection[sideIndex].delete(item.number);
     renderSide(sideIndex);
-    log(`Pattern ${item.number} in ${project.name} was cleared.`);
   } catch (error) {
-    log(error.message);
+    alert(error.message);
     console.error(error);
   }
 }
@@ -495,7 +568,7 @@ async function copyBytes(fromPath, toPath) {
     const wdt = await readFile(await srcDir.getFileHandle(wdtName));
     await writeFile(destDir, wdtName, wdt);
   } catch {
-    log(`No .wdt beside ${fileName}. The wav was still copied.`);
+    /* The wav is enough when the device has no .wdt beside it. */
   }
 }
 
@@ -505,49 +578,106 @@ async function ensureDir(root, parts) {
   return current;
 }
 
-async function dropPattern(fromSide, fromNumber, toSide, toNumber) {
-  if (Number.isNaN(fromSide) || fromSide === toSide) return;
+function blankPattern(project, number) {
+  const template = project.patterns.find((pattern) => pattern && pattern.info.empty);
+  if (!template) throw new Error("This project has no empty pattern to restore, so the move was left unfinished.");
+  return retargetPattern(template.bytes, number, new Map());
+}
+
+function storePattern(project, number, bytes) {
+  project.patterns[number - 1] = {
+    number,
+    fileName: patternFileName(number),
+    bytes,
+    info: parsePattern(bytes),
+  };
+}
+
+async function transferPatterns(fromSide, numbers, toSide, toNumber) {
+  if (Number.isNaN(fromSide) || !numbers.length) return;
   const source = projects[fromSide];
   const dest = projects[toSide];
   if (!source || !dest) return;
-  const item = source.patterns[fromNumber - 1];
-  const target = dest.patterns[toNumber - 1];
-  if (!item || item.info.empty) return;
-  if (target && !target.info.empty) {
-    const ok = confirm(`Replace pattern ${toNumber} in ${dest.name}?`);
-    if (!ok) return;
+  const moving = fromSide === toSide;
+  const items = numbers.map((number) => source.patterns[number - 1]);
+  if (items.some((item) => !item || item.info.empty)) return;
+  const last = toNumber + items.length - 1;
+  if (toNumber < 1 || last > 128) {
+    alert("There are not enough pattern slots from the drop point.");
+    return;
   }
+  const destinations = items.map((_, index) => toNumber + index);
+  const occupied = destinations.filter((number) => {
+    if (moving && numbers.includes(number)) return false;
+    const target = dest.patterns[number - 1];
+    return target && !target.info.empty;
+  });
+  if (occupied.length === 1) {
+    if (!confirm(`Replace pattern ${occupied[0]} in ${dest.name}?`)) return;
+  } else if (occupied.length > 1) {
+    if (!confirm(`Replace ${occupied.length} patterns in ${dest.name}, starting at ${toNumber}?`)) return;
+  }
+  const title = moving ? "Moving" : "Copying";
   try {
-    log(`Copying ${source.name} pattern ${fromNumber} to ${dest.name} pattern ${toNumber}…`);
-    const folder = poolFolderForProject(dest.config, dest.name);
-    const { map, copies } = assignSlots(
-      source.slots,
-      item.info.tracks.map((t) => t.slot),
-      dest.slots,
-      folder,
-    );
-    for (const copy of copies) {
-      log(`Sample slot ${copy.destIndex + 1}: ${copy.file}`);
-      await copyBytes(copy.fromPath, copy.toPath);
+    openProgress(title);
+    if (moving) {
+      const clears = numbers.filter((number) => !destinations.includes(number));
+      const blanks = new Map(clears.map((number) => [number, blankPattern(source, number)]));
+      const total = items.length + clears.length;
+      let done = 0;
+      for (let index = 0; index < items.length; index++) {
+        const number = destinations[index];
+        const patched = retargetPattern(items[index].bytes, number, new Map());
+        reportProgress(done, total, `Pattern ${items[index].number} → ${number}`);
+        await writeFile(dest.dir, patternFileName(number), patched);
+        storePattern(dest, number, patched);
+        done += 1;
+      }
+      for (const number of clears) {
+        reportProgress(done, total, `Clearing pattern ${number}`);
+        const blank = blanks.get(number);
+        await writeFile(source.dir, patternFileName(number), blank);
+        storePattern(source, number, blank);
+        selection[fromSide].delete(number);
+        done += 1;
+      }
+      for (const number of destinations) selection[fromSide].add(number);
+    } else {
+      const folder = poolFolderForProject(dest.config, dest.name);
+      const tracks = items.flatMap((item) => item.info.tracks.map((track) => track.slot));
+      const { map, copies } = assignSlots(source.slots, tracks, dest.slots, folder);
+      const total = copies.length + items.length + (copies.length ? 1 : 0);
+      let done = 0;
+      let config = dest.config;
+      for (const copy of copies) {
+        reportProgress(done, total, copy.file);
+        await copyBytes(copy.fromPath, copy.toPath);
+        config = writeSlot(config, copy.destIndex, copy.toPath);
+        done += 1;
+      }
+      if (copies.length) {
+        reportProgress(done, total, "Saving sample slots");
+        await writeFile(dest.dir, "Config", config);
+        done += 1;
+      }
+      dest.config = config;
+      dest.slots = sampleSlots(config).slots;
+      for (let index = 0; index < items.length; index++) {
+        const number = destinations[index];
+        const patched = retargetPattern(items[index].bytes, number, map);
+        reportProgress(done, total, `Pattern ${items[index].number} → ${number}`);
+        await writeFile(dest.dir, patternFileName(number), patched);
+        storePattern(dest, number, patched);
+        done += 1;
+      }
     }
-    let config = dest.config;
-    for (const copy of copies) config = writeSlot(config, copy.destIndex, copy.toPath);
-    if (copies.length) await writeFile(dest.dir, "Config", config);
-    const patched = retargetPattern(item.bytes, toNumber, map);
-    await writeFile(dest.dir, patternFileName(toNumber), patched);
-    dest.config = config;
-    dest.slots = sampleSlots(config).slots;
-    dest.patterns[toNumber - 1] = {
-      number: toNumber,
-      fileName: patternFileName(toNumber),
-      bytes: patched,
-      info: parsePattern(patched),
-    };
+    document.querySelector("#progress .fill").style.width = "100%";
     renderSide(toSide);
-    log(`Pattern ${toNumber} in ${dest.name} is ready.`);
+    closeProgress();
   } catch (error) {
-    log(error.message);
     console.error(error);
+    if (document.querySelector("#progress").open) failProgress(error.message);
+    else alert(error.message);
   }
 }
 
@@ -557,7 +687,7 @@ document.querySelector("#info").addEventListener("click", () => {
 
 openButton.addEventListener("click", async () => {
   if (!window.showDirectoryPicker) {
-    log("This page needs Chrome or Edge. The folder picker is not in this browser.");
+    alert("This page needs Chrome or Edge. The folder picker is not in this browser.");
     return;
   }
   const help = document.querySelector("#pick-help");
@@ -585,7 +715,7 @@ openButton.addEventListener("click", async () => {
       help.addEventListener("close", onClose);
     });
   } catch (error) {
-    if (error.name !== "AbortError") log(error.message);
+    if (error.name !== "AbortError") alert(error.message);
     return;
   }
   if (!picked) return;
@@ -597,8 +727,7 @@ openButton.addEventListener("click", async () => {
     workspace.hidden = false;
     renderSide(0);
     renderSide(1);
-    log(`Found ${names.length} projects. Pick one on each side, then drag a pattern across.`);
   } catch (error) {
-    if (error.name !== "AbortError") log(error.message);
+    if (error.name !== "AbortError") alert(error.message);
   }
 });

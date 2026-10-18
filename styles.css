@@ -44,12 +44,12 @@ h1 { margin: 0; }
 
 .title-block { min-width: 0; }
 
-.disclaimer {
+.disclaimer, dialog p.warning {
   margin: 6px 0 0;
   max-width: 46rem;
   font-size: 13px;
   line-height: 1.4;
-  color: var(--muted);
+  color: #e36b5a;
 }
 
 button, select {
@@ -262,13 +262,36 @@ select { width: 100%; padding: 8px; }
 }
 .pattern.drop { border-color: var(--accent); }
 
-#log {
-  height: 72px;
+.pattern.selected {
+  border-color: var(--accent);
+  background: #3a2e1c;
+}
+
+#progress { width: min(32rem, calc(100vw - 32px)); }
+#progress .track {
+  height: 8px;
+  margin-top: 8px;
+  background: #1a1713;
+  border-radius: 99px;
+  overflow: hidden;
+}
+#progress .fill { height: 100%; width: 0; background: var(--accent); }
+#progress-files {
+  max-height: 220px;
   overflow: auto;
+  margin: 12px 0 0;
+  padding: 0 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 13px;
+}
+#progress-files li { margin: 0 0 4px; }
+
+#boot-note {
   padding: 8px 24px 16px;
   color: var(--muted);
   font-size: 13px;
 }
+#boot-note:empty { display: none; }
 
 @media (max-width: 800px) {
   #workspace { grid-template-columns: 1fr; }
