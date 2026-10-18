@@ -175,23 +175,38 @@ select { width: 100%; padding: 8px; }
   align-items: baseline;
 }
 
+button.twist-hit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border-radius: 4px;
+  flex: none;
+  cursor: pointer;
+  font-weight: 400;
+}
+button.twist-hit:hover { background: #3a3228; }
+
 .twist {
   width: 0;
   height: 0;
-  margin-top: 5px;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
   border-left: 7px solid var(--muted);
   flex: none;
 }
+button.twist-hit:hover .twist { border-left-color: var(--ink); }
 
 .pattern.open .twist {
-  margin-top: 7px;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
   border-top: 7px solid var(--accent);
   border-bottom: 0;
 }
+.pattern.open button.twist-hit:hover .twist { border-top-color: var(--ink); }
 
 .num {
   font-variant-numeric: tabular-nums;
@@ -219,7 +234,6 @@ select { width: 100%; padding: 8px; }
 .pattern.empty { color: var(--empty); }
 .pattern.empty .num { color: var(--empty); }
 .pattern-title[draggable="true"] { cursor: grab; }
-.pattern-title { cursor: pointer; }
 
 .samples {
   margin-top: 8px;

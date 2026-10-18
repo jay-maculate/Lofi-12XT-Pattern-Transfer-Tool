@@ -293,9 +293,30 @@ function renderPattern(item, sideIndex) {
   if (item.info.empty) row.classList.add("empty");
   const title = document.createElement("div");
   title.className = "pattern-title";
-  const mark = document.createElement("span");
-  mark.className = "twist";
-  mark.setAttribute("aria-hidden", "true");
+  const mark = document.createElement("button");
+  mark.type = "button";
+  mark.className = "twist-hit";
+  mark.title = "Show samples";
+  mark.setAttribute("aria-label", `Show samples for pattern ${item.number}`);
+  const markGlyph = document.createElement("span");
+  markGlyph.className = "twist";
+  markGlyph.setAttribute("aria-hidden", "true");
+  mark.append(markGlyph);
+  mark.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = row.querySelector(".samples");
+    if (open) {
+      stopPlayback();
+      open.remove();
+      row.classList.remove("open");
+      mark.title = "Show samples";
+      return;
+    }
+    row.classList.add("open");
+    mark.title = "Hide samples";
+    expandPattern(row, item, sideIndex);
+  });
+  mark.addEventListener("dragstart", (event) => event.preventDefault());
   const num = document.createElement("span");
   num.className = "num";
   num.textContent = String(item.number).padStart(3, "0");
@@ -339,22 +360,22 @@ function renderPattern(item, sideIndex) {
   }
   if (selection[sideIndex].has(item.number)) row.classList.add("selected");
   if (!item.info.empty) title.draggable = true;
-  title.addEventListener("click", (event) => {
-    if (event.shiftKey && !item.info.empty) {
+  row.addEventListener("click", (event) => {
+    if (item.info.empty) return;
+    if (event.target.closest(".twist-hit, .trash, .samples, .play")) return;
+    const selected = selection[sideIndex];
+    if (event.shiftKey) {
       selectRange(sideIndex, item.number);
-      paintSelection(sideIndex);
-      return;
+    } else if (event.ctrlKey || event.metaKey) {
+      if (selected.has(item.number)) selected.delete(item.number);
+      else selected.add(item.number);
+      selectionAnchor[sideIndex] = item.number;
+    } else {
+      selected.clear();
+      selected.add(item.number);
+      selectionAnchor[sideIndex] = item.number;
     }
-    if (!item.info.empty) selectionAnchor[sideIndex] = item.number;
-    const open = row.querySelector(".samples");
-    if (open) {
-      stopPlayback();
-      open.remove();
-      row.classList.remove("open");
-      return;
-    }
-    row.classList.add("open");
-    expandPattern(row, item, sideIndex);
+    paintSelection(sideIndex);
   });
   row.append(title, meta);
   title.addEventListener("dragstart", (event) => {
@@ -627,6 +648,51 @@ async function matchingSlots(sourceSlots, sourceIndexes, destSlots) {
   return aliases;
 }
 
+function planShift(dest, start, count) {
+  const last = start + count - 1;
+  const displaced = [];
+  const following = [];
+  for (let number = start; number <= 128; number++) {
+    const item = dest.patterns[number - 1];
+    if (!item || item.info.empty) continue;
+    if (number <= last) displaced.push(item);
+    else following.push(item);
+  }
+  const shiftBy = displaced.length;
+  const moves = [];
+  displaced.forEach((item, index) => moves.push({ item, number: last + 1 + index }));
+  for (const item of following) moves.push({ item, number: item.number + shiftBy });
+  return { moves, overflow: moves.some((move) => move.number > 128) };
+}
+
+async function applyShift(dest, plan) {
+  const template = dest.patterns.find((pattern) => pattern && pattern.info.empty);
+  const writes = plan.moves.map((move) => ({
+    number: move.number,
+    bytes: retargetPattern(move.item.bytes, move.number, new Map()),
+  }));
+  const taken = new Set(writes.map((write) => write.number));
+  const clears = [...new Set(plan.moves.map((move) => move.item.number))].filter((number) => !taken.has(number));
+  if (clears.length && !template) {
+    throw new Error("This project has no empty pattern to restore, so the shift was left unfinished.");
+  }
+  const total = writes.length + clears.length;
+  let done = 0;
+  for (const write of writes.sort((a, b) => b.number - a.number)) {
+    reportProgress(done, total, `Shifting pattern ${write.number}`);
+    await writeFile(dest.dir, patternFileName(write.number), write.bytes);
+    storePattern(dest, write.number, write.bytes);
+    done += 1;
+  }
+  for (const number of clears) {
+    const blank = retargetPattern(template.bytes, number, new Map());
+    reportProgress(done, total, `Clearing pattern ${number}`);
+    await writeFile(dest.dir, patternFileName(number), blank);
+    storePattern(dest, number, blank);
+    done += 1;
+  }
+}
+
 function blankPattern(project, number) {
   const template = project.patterns.find((pattern) => pattern && pattern.info.empty);
   if (!template) throw new Error("This project has no empty pattern to restore, so the move was left unfinished.");
@@ -646,8 +712,8 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
   if (Number.isNaN(fromSide) || !numbers.length) return;
   const source = projects[fromSide];
   const dest = projects[toSide];
-  if (!source || !dest) return;
-  const moving = fromSide === toSide;
+  if (!source || !dest || fromSide === toSide) return;
+  const moving = false;
   const items = numbers.map((number) => source.patterns[number - 1]);
   if (items.some((item) => !item || item.info.empty)) return;
   const last = toNumber + items.length - 1;
@@ -661,7 +727,22 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
     const target = dest.patterns[number - 1];
     return target && !target.info.empty;
   });
-  if (occupied.length === 1) {
+  let shiftPlan = null;
+  if (!moving && occupied.length) {
+    shiftPlan = planShift(dest, toNumber, items.length);
+    if (shiftPlan.overflow) {
+      alert(`Not enough free pattern slots at the end of ${dest.name} to shift patterns down.`);
+      return;
+    }
+    const open = items.length - occupied.length;
+    const extra = occupied.length === 1 ? "the extra pattern" : "the extra patterns";
+    const blocking = occupied.length === 1 ? "one pattern is" : `${occupied.length} patterns are`;
+    const openText = open === 0
+      ? "No pattern slots are open"
+      : `Only ${open} pattern ${open === 1 ? "slot is" : "slots are"} open`;
+    const ok = confirm(`${openText} and ${blocking} already in the way. Shift existing patterns down to fit ${extra}?`);
+    if (!ok) return;
+  } else if (occupied.length === 1) {
     if (!confirm(`Replace pattern ${occupied[0]} in ${dest.name}?`)) return;
   } else if (occupied.length > 1) {
     if (!confirm(`Replace ${occupied.length} patterns in ${dest.name}, starting at ${toNumber}?`)) return;
@@ -692,6 +773,7 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
       }
       for (const number of destinations) selection[fromSide].add(number);
     } else {
+      if (shiftPlan) await applyShift(dest, shiftPlan);
       const folder = poolFolderForProject(dest.config, dest.name);
       const tracks = items.flatMap((item) => item.info.tracks.map((track) => track.slot));
       const aliases = await matchingSlots(source.slots, tracks, dest.slots);
