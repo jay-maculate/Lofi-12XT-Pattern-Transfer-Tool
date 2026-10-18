@@ -281,7 +281,13 @@ button.twist-hit:hover .twist { border-left-color: var(--ink); }
   background: #3a2e1c;
 }
 
-#progress { width: min(32rem, calc(100vw - 32px)); }
+#progress {
+  width: min(32rem, calc(100vw - 32px));
+  height: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 #progress .track {
   height: 8px;
   margin-top: 8px;
@@ -291,13 +297,15 @@ button.twist-hit:hover .twist { border-left-color: var(--ink); }
 }
 #progress .fill { height: 100%; width: 0; background: var(--accent); }
 #progress-files {
-  max-height: 220px;
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   margin: 12px 0 0;
   padding: 0 0 0 1.1rem;
   color: var(--muted);
   font-size: 13px;
 }
+#progress form { margin-top: 12px; }
 #progress-files li { margin: 0 0 4px; }
 
 #boot-note {

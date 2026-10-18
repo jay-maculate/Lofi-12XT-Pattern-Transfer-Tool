@@ -42,7 +42,7 @@ function reportProgress(done, total, label) {
   document.querySelector("#progress .fill").style.width = `${Math.round((done / total) * 100)}%`;
   const line = document.createElement("li");
   line.textContent = label;
-  document.querySelector("#progress-files").append(line);
+  document.querySelector("#progress-files").prepend(line);
 }
 
 function closeProgress() {
