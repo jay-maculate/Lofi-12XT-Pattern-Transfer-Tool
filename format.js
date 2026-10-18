@@ -175,7 +175,25 @@ export function systemRelative(poolPath) {
   return poolPath.slice(at + marker.length).split("/");
 }
 
-export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoolFolder) {
+function poolFilePath(folder, file) {
+  return `/Lofi-12XT/System/Pool/Audio/${folder}/${file}`;
+}
+
+function splitFileName(file) {
+  const dot = file.lastIndexOf(".");
+  if (dot <= 0) return { stem: file, ext: "" };
+  return { stem: file.slice(0, dot), ext: file.slice(dot) };
+}
+
+function unusedFileName(file, folder, byPath) {
+  const { stem, ext } = splitFileName(file);
+  if (!byPath.has(poolFilePath(folder, file))) return file;
+  let n = 2;
+  while (byPath.has(poolFilePath(folder, `${stem}-${n}${ext}`))) n += 1;
+  return `${stem}-${n}${ext}`;
+}
+
+export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoolFolder, aliases = new Map()) {
   const byPath = new Map(destSlotList.filter((s) => s.path).map((s) => [s.path, s.index]));
   const taken = new Set(destSlotList.filter((s) => s.path).map((s) => s.index));
   let cursor = 1;
@@ -194,12 +212,12 @@ export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoo
       map.set(srcIndex, byPath.get(src.path));
       continue;
     }
-    const file = src.path.split("/").pop();
-    const destPath = `/Lofi-12XT/System/Pool/Audio/${destPoolFolder}/${file}`;
-    if (byPath.has(destPath)) {
-      map.set(srcIndex, byPath.get(destPath));
+    if (aliases.has(src.path)) {
+      map.set(srcIndex, aliases.get(src.path));
       continue;
     }
+    const file = unusedFileName(src.path.split("/").pop(), destPoolFolder, byPath);
+    const destPath = poolFilePath(destPoolFolder, file);
     const destIndex = nextFree();
     map.set(srcIndex, destIndex);
     byPath.set(destPath, destIndex);

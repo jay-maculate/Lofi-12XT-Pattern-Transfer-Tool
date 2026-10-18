@@ -562,11 +562,12 @@ async function copyBytes(fromPath, toPath) {
   const destDir = await ensureDir(system, destParts.slice(0, -1));
   const fileName = srcParts.at(-1);
   const wdtName = fileName.replace(/\.wav$/i, ".wdt");
+  const destWav = destParts.at(-1);
   const bytes = await readFile(await srcDir.getFileHandle(fileName));
-  await writeFile(destDir, destParts.at(-1), bytes);
+  await writeFile(destDir, destWav, bytes);
   try {
     const wdt = await readFile(await srcDir.getFileHandle(wdtName));
-    await writeFile(destDir, wdtName, wdt);
+    await writeFile(destDir, destWav.replace(/\.wav$/i, ".wdt"), wdt);
   } catch {
     /* The wav is enough when the device has no .wdt beside it. */
   }
@@ -576,6 +577,54 @@ async function ensureDir(root, parts) {
   let current = root;
   for (const part of parts) current = await current.getDirectoryHandle(part, { create: true });
   return current;
+}
+
+function sameBytes(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function sameSampleName(candidate, file) {
+  if (candidate === file) return true;
+  const dot = file.lastIndexOf(".");
+  const stem = dot > 0 ? file.slice(0, dot) : file;
+  const ext = dot > 0 ? file.slice(dot) : "";
+  if (!candidate.startsWith(`${stem}-`) || !candidate.endsWith(ext)) return false;
+  return /^\d+$/.test(candidate.slice(stem.length + 1, candidate.length - ext.length));
+}
+
+async function matchingSlots(sourceSlots, sourceIndexes, destSlots) {
+  const aliases = new Map();
+  const seen = new Set();
+  for (const srcIndex of sourceIndexes) {
+    const src = sourceSlots[srcIndex];
+    if (!src?.path || seen.has(src.path)) continue;
+    seen.add(src.path);
+    const file = src.path.split("/").pop();
+    const candidates = destSlots.filter((slot) => slot.path && sameSampleName(slot.file, file));
+    if (!candidates.length) continue;
+    let srcBytes;
+    try {
+      const parts = systemRelative(src.path);
+      srcBytes = await readFile(await (await walk(system, parts.slice(0, -1))).getFileHandle(parts.at(-1)));
+    } catch {
+      continue;
+    }
+    for (const slot of candidates) {
+      try {
+        const parts = systemRelative(slot.path);
+        const destBytes = await readFile(await (await walk(system, parts.slice(0, -1))).getFileHandle(parts.at(-1)));
+        if (sameBytes(srcBytes, destBytes)) {
+          aliases.set(src.path, slot.index);
+          break;
+        }
+      } catch {
+        /* A missing dest file is not a match. */
+      }
+    }
+  }
+  return aliases;
 }
 
 function blankPattern(project, number) {
@@ -645,7 +694,8 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
     } else {
       const folder = poolFolderForProject(dest.config, dest.name);
       const tracks = items.flatMap((item) => item.info.tracks.map((track) => track.slot));
-      const { map, copies } = assignSlots(source.slots, tracks, dest.slots, folder);
+      const aliases = await matchingSlots(source.slots, tracks, dest.slots);
+      const { map, copies } = assignSlots(source.slots, tracks, dest.slots, folder, aliases);
       const total = copies.length + items.length + (copies.length ? 1 : 0);
       let done = 0;
       let config = dest.config;

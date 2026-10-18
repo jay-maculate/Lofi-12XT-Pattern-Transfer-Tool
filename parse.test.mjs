@@ -24,6 +24,22 @@ if (moved.tempo !== 93) throw new Error("tempo changed");
 if (moved.name !== "26-09-26B") throw new Error("name changed");
 console.log("ok", moved.tracks.map((t) => t.slot).join(","));
 
+const emptyDest = Array.from({ length: 256 }, (_, index) => ({ index, path: "", file: "" }));
+const clashSources = Array.from({ length: 256 }, (_, index) => ({ index, path: "", file: "" }));
+clashSources[1] = { index: 1, path: "/Lofi-12XT/System/Pool/Audio/Project03_C74F065C/003MIX01.wav", file: "003MIX01.wav" };
+clashSources[2] = { index: 2, path: "/Lofi-12XT/System/Pool/Audio/BEATS03_C74F065C/003MIX01.wav", file: "003MIX01.wav" };
+const clash = assignSlots(clashSources, [1, 2], emptyDest, "DEST_HASH");
+if (clash.copies[0].file !== "003MIX01.wav" || clash.copies[1].file !== "003MIX01-2.wav") {
+  throw new Error(clash.copies.map((copy) => copy.file).join(","));
+}
+if (clash.map.get(1) === clash.map.get(2)) throw new Error("same-name files shared a slot");
+const again = assignSlots(clashSources, [2], emptyDest.map((slot, index) => (
+  index === clash.map.get(1) ? { ...slot, path: clash.copies[0].toPath, file: clash.copies[0].file } : slot
+)), "DEST_HASH");
+if (again.copies[0].file !== "003MIX01-2.wav") throw new Error(again.copies[0].file);
+const reused = assignSlots(clashSources, [2], emptyDest, "DEST_HASH", new Map([[clashSources[2].path, 4]]));
+if (reused.copies.length !== 0 || reused.map.get(2) !== 4) throw new Error("alias was not reused");
+
 const beats02 = new Uint8Array(readFileSync(new URL("Project/BEATS02/Pattern001", root)));
 const b2 = parsePattern(beats02);
 if (!b2.name || !Number.isFinite(b2.tempo)) throw new Error("BEATS02 parse");
