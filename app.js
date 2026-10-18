@@ -505,6 +505,7 @@ function renderSide(sideIndex) {
   });
   list.addEventListener("drop", (event) => {
     const drag = readDrag(event.dataTransfer.getData("text/plain"));
+    if (drag.side === sideIndex) return;
     const dest = projects[sideIndex];
     const empty = dest?.patterns.find((p) => p && p.info.empty);
     if (!empty) {
@@ -712,8 +713,9 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
   if (Number.isNaN(fromSide) || !numbers.length) return;
   const source = projects[fromSide];
   const dest = projects[toSide];
-  if (!source || !dest || fromSide === toSide) return;
-  const moving = false;
+  if (!source || !dest) return;
+  const moving = fromSide === toSide;
+  if (moving && numbers.includes(toNumber)) return;
   const items = numbers.map((number) => source.patterns[number - 1]);
   if (items.some((item) => !item || item.info.empty)) return;
   const last = toNumber + items.length - 1;
