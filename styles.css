@@ -284,10 +284,10 @@ button.twist-hit:hover .twist { border-left-color: var(--ink); }
 #progress {
   width: min(32rem, calc(100vw - 32px));
   height: 360px;
-  display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+#progress[open] { display: flex; }
 #progress .track {
   height: 8px;
   margin-top: 8px;
