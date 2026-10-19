@@ -32,6 +32,7 @@ function openProgress(title) {
   document.querySelector("#progress-label").textContent = "";
   document.querySelector("#progress-files").replaceChildren();
   dialog.querySelector(".fill").style.width = "0%";
+  dialog.querySelector(".track").hidden = false;
   document.querySelector("#progress-close").hidden = true;
   progressBusy = true;
   if (!dialog.open) dialog.showModal();
@@ -53,6 +54,7 @@ function closeProgress() {
 function failProgress(message) {
   progressBusy = false;
   document.querySelector("#progress-label").textContent = message;
+  document.querySelector("#progress .track").hidden = message.startsWith("Your selection exceeds");
   document.querySelector("#progress-close").hidden = false;
 }
 
@@ -782,6 +784,18 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
     if (!confirm(`Replace ${occupied.length} patterns in ${dest.name}, starting at ${toNumber}?`)) return;
   }
   const title = moving ? "Moving" : "Copying";
+  let copyPlan = null;
+  if (!moving) {
+    const folder = poolFolderForProject(dest.config, dest.name);
+    const tracks = items.flatMap((item) => item.info.tracks.map((track) => track.slot));
+    try {
+      const aliases = await matchingSlots(source.slots, tracks, dest.slots);
+      copyPlan = { ...assignSlots(source.slots, tracks, dest.slots, folder, aliases) };
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
+  }
   try {
     openProgress(title);
     if (moving) {
@@ -808,10 +822,7 @@ async function transferPatterns(fromSide, numbers, toSide, toNumber) {
       for (const number of destinations) selection[fromSide].add(number);
     } else {
       if (shiftPlan) await applyShift(dest, shiftPlan);
-      const folder = poolFolderForProject(dest.config, dest.name);
-      const tracks = items.flatMap((item) => item.info.tracks.map((track) => track.slot));
-      const aliases = await matchingSlots(source.slots, tracks, dest.slots);
-      const { map, copies } = assignSlots(source.slots, tracks, dest.slots, folder, aliases);
+      const { map, copies } = copyPlan;
       const total = copies.length + items.length + (copies.length ? 1 : 0);
       let done = 0;
       let config = dest.config;

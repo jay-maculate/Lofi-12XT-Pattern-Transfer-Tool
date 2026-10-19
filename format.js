@@ -199,7 +199,7 @@ export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoo
   let cursor = 1;
   const nextFree = () => {
     while (cursor < 256 && taken.has(cursor)) cursor++;
-    if (cursor >= 256) throw new Error("Your selection exceeds the available number of sample slots");
+    if (cursor >= 256) throw new Error("Your selection exceeds the available number of sample slots.");
     taken.add(cursor);
     return cursor++;
   };
@@ -214,7 +214,7 @@ export function assignSlots(sourceSlotList, sourceIndexes, destSlotList, destPoo
   for (let index = 1; index < 256; index++) if (!taken.has(index)) free += 1;
   if (needed.length > free) {
     const over = needed.length - free;
-    throw new Error(`Your selection exceeds the available number of sample slots by ${over} ${over === 1 ? "sample" : "samples"}`);
+    throw new Error(`Your selection exceeds the available number of sample slots by ${over} ${over === 1 ? "sample" : "samples"}.`);
   }
   const map = new Map();
   const copies = [];
